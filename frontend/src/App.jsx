@@ -10,22 +10,28 @@ import OrganizerLogin from "./pages/OrganizerLogin";
 import MyBookings from "./pages/MyBookings";
 import OrganizerDashboard from "./pages/OrganizerDashboard";
 import EditEvent from "./pages/EditEvent";
+import ScrollToTop from "./components/ScrollToTop";
+
+
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/events" element={<Events />} />
-      <Route path="/events/:id" element={<EventDetails />} />
-      <Route path="/events/:id/book" element={<SeatSelection />} />
-      <Route path="/business" element={<OrganizerLanding />} />
-      <Route path="/business/login" element={<OrganizerLogin />} />
-      <Route path="/host-event" element={<HostEvent />} />
-      <Route path="/bookings" element={<MyBookings />} />
-      <Route path="/business/dashboard" element={<OrganizerDashboard />} />
-      <Route path="/business/events/:id/edit" element={<EditEvent />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/events" element={<Events />} />
+        <Route path="/events/:id" element={<EventDetails />} />
+        <Route path="/events/:id/book" element={<SeatSelection />} />
+        <Route path="/business" element={<OrganizerLanding />} />
+        <Route path="/business/login" element={<OrganizerLogin />} />
+        <Route path="/host-event" element={<HostEvent />} />
+        <Route path="/bookings" element={<MyBookings />} />
+        <Route path="/business/dashboard" element={<OrganizerDashboard />} />
+        <Route path="/business/events/:id/edit" element={<EditEvent />} />
+      </Routes>
+    </>
   );
 }
 
