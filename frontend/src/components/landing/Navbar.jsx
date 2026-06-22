@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import ThemeToggle from "../ThemeToggle";
@@ -6,6 +6,7 @@ import ThemeToggle from "../ThemeToggle";
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null)
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -18,6 +19,22 @@ export default function Navbar() {
     setDropdownOpen(false);
     navigate("/");
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    //Add the Event Listener 
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    // Clean up the listener when component unmounts
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []); //Empty array ensures this only runs once on mount
 
   return (
     <header className="fixed w-full top-0 z-50 bg-white/90 dark:bg-black/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
@@ -32,29 +49,26 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-8">
           <Link
             to="/"
-            className={`relative py-1 font-semibold text-sm transition-colors group ${
-              isActive("/") ? "text-blue-600" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-            }`}
+            className={`relative py-1 font-semibold text-sm transition-colors group ${isActive("/") ? "text-blue-600" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              }`}
           >
             Home
             <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[2px] bg-blue-600 dark:bg-blue-500 transition-all duration-300 w-0 group-hover:w-full shadow-[0_0_8px_rgba(37,99,235,0.5)]" />
           </Link>
           <Link
             to="/events"
-            className={`relative py-1 font-semibold text-sm transition-colors group ${
-              isActive("/events") ? "text-blue-600" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-            }`}
+            className={`relative py-1 font-semibold text-sm transition-colors group ${isActive("/events") ? "text-blue-600" : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              }`}
           >
             Events
             <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[2px] bg-blue-600 dark:bg-blue-500 transition-all duration-300 w-0 group-hover:w-full shadow-[0_0_8px_rgba(37,99,235,0.5)]" />
           </Link>
           <Link
             to="/business"
-            className={`relative py-1 text-sm font-semibold transition-colors duration-200 group ${
-              isActive("/business") || isActive("/host-event")
-                ? "text-primary dark:text-primary-light"
-                : "text-slate-600 hover:text-primary dark:text-slate-300 dark:hover:text-primary-light"
-            }`}
+            className={`relative py-1 text-sm font-semibold transition-colors duration-200 group ${isActive("/business") || isActive("/host-event")
+              ? "text-primary dark:text-primary-light"
+              : "text-slate-600 hover:text-primary dark:text-slate-300 dark:hover:text-primary-light"
+              }`}
           >
             Host Event
             <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[2px] bg-primary dark:bg-blue-500 transition-all duration-300 w-0 group-hover:w-full shadow-[0_0_8px_rgba(37,99,235,0.5)]" />
@@ -66,7 +80,7 @@ export default function Navbar() {
           <ThemeToggle />
 
           {/* Profile / Login */}
-          <div className="relative">
+          <div className="relative" ref={dropdownRef}>
             {user ? (
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -86,7 +100,7 @@ export default function Navbar() {
             )}
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden py-2">
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden py-2">
                 {user ? (
                   <>
                     <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
@@ -131,7 +145,7 @@ export default function Navbar() {
                         Signup
                       </Link>
                     </div>
-                    
+
                     <div className="border-t border-slate-100 dark:border-slate-700/50 my-1"></div>
 
                     {/* For Event Organisers */}
@@ -142,16 +156,6 @@ export default function Navbar() {
                       </Link>
                       <Link to="/business/login" state={{ showSignUp: true }} onClick={() => setDropdownOpen(false)} className="block py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-primary transition-colors">
                         Signup
-                      </Link>
-                    </div>
-
-                    <div className="border-t border-slate-100 dark:border-slate-700/50 my-1"></div>
-
-                    {/* For Promoters */}
-                    <div className="px-4 py-2">
-                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">For Promoters</p>
-                      <Link to="/business/login" onClick={() => setDropdownOpen(false)} className="block py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-primary transition-colors">
-                        Login
                       </Link>
                     </div>
                   </div>
@@ -177,27 +181,24 @@ export default function Navbar() {
             <Link
               to="/"
               onClick={() => setMobileOpen(false)}
-              className={`px-4 py-3 rounded-lg font-semibold transition-colors ${
-                isActive("/") ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-              }`}
+              className={`px-4 py-3 rounded-lg font-semibold transition-colors ${isActive("/") ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                }`}
             >
               Home
             </Link>
             <Link
               to="/events"
               onClick={() => setMobileOpen(false)}
-              className={`px-4 py-3 rounded-lg font-semibold transition-colors ${
-                isActive("/events") ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-              }`}
+              className={`px-4 py-3 rounded-lg font-semibold transition-colors ${isActive("/events") ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                }`}
             >
               Events
             </Link>
             <Link
               to="/business"
               onClick={() => setMobileOpen(false)}
-              className={`px-4 py-3 rounded-lg font-semibold transition-colors ${
-                isActive("/business") || isActive("/host-event") ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-              }`}
+              className={`px-4 py-3 rounded-lg font-semibold transition-colors ${isActive("/business") || isActive("/host-event") ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600" : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                }`}
             >
               Host Event
             </Link>
