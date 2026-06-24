@@ -3,8 +3,9 @@ const Seat = require("../models/Seat");
 const Reservation = require("../models/Reservation");
 const Booking = require("../models/Booking");
 const Event = require("../models/Event");
-const Razorpay = require("razorpay");
-const crypto = require("crypto");
+const User = require("../models/User");
+const { calculateTotalPrice, createRazorpayOrder, verifyPaymentSignature } = require("../utils/razorpay/razorpayService");
+const { sendTicketConfirmationEmail } = require("../utils/email/emailService");
 
 //@desc Confirm booking from reservation
 // @route POST /api/bookings
@@ -19,7 +20,7 @@ const confirmBooking = async (req, res) => {
     session.startTransaction();
 
     try {
-        //Step 1: Find the reservation and check it belongs to this user 
+        //Step 1: Find the reservation and check it belongs to this user
         const reservation = await Reservation.findOne({
             _id: reservationId,
             userId: req.user._id,
@@ -60,63 +61,24 @@ const confirmBooking = async (req, res) => {
             return res.status(404).json({ message: "Event not found" });
         }
 
-        // Calculate totalPrice based on ticketing rules
-        const basePrice = event.ticketType === "free" ? 0 : (event.ticketPrice || 0);
-        const totalSeats = event.totalSeats || 0;
-        const category = event.category?.toLowerCase() || "";
-        const isConcert = category.includes("concert") || category.includes("music") || category.includes("festival") || category.includes("nightlife");
+        const totalPrice = calculateTotalPrice(event, reservation.seatNumbers);
 
-        let totalPrice = 0;
-        if (event.ticketType === "free") {
-            totalPrice = 0;
-        } else if (isConcert) {
-            reservation.seatNumbers.forEach(seatNum => {
-                if (seatNum <= Math.ceil(totalSeats * 0.15)) {
-                    totalPrice += Math.round(basePrice * 3); // VIP
-                } else if (seatNum <= Math.ceil(totalSeats * 0.40)) {
-                    totalPrice += Math.round(basePrice * 2); // Gold
-                } else {
-                    totalPrice += basePrice; // GA
-                }
-            });
-        } else {
-            totalPrice = basePrice * reservation.seatNumbers.length;
-        }
-
-        // Verify Payment details if totalPrice > 0
+        // Step 4: Verify Payment details if totalPrice > 0
         if (totalPrice > 0) {
-            const keyId = process.env.RAZORPAY_KEY_ID;
-            const keySecret = process.env.RAZORPAY_KEY_SECRET;
-            const isDummy = !keyId || !keySecret || keyId.includes("mock") || keyId.includes("default");
+            const { valid, error } = verifyPaymentSignature({
+                razorpayOrderId,
+                razorpayPaymentId,
+                razorpaySignature,
+            });
 
-            if (isDummy) {
-                // In mock sandbox mode, check parameters are present
-                if (!razorpayOrderId || !razorpayPaymentId) {
-                    await session.abortTransaction();
-                    session.endSession();
-                    return res.status(400).json({ message: "Mock sandbox payment validation failed: transaction ID missing" });
-                }
-            } else {
-                // Real Mode, run cryptographic validation
-                if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-                    await session.abortTransaction();
-                    session.endSession();
-                    return res.status(400).json({ message: "Payment details missing" });
-                }
-
-                const shasum = crypto.createHmac("sha256", keySecret);
-                shasum.update(`${razorpayOrderId}|${razorpayPaymentId}`);
-                const digest = shasum.digest("hex");
-
-                if (digest !== razorpaySignature) {
-                    await session.abortTransaction();
-                    session.endSession();
-                    return res.status(400).json({ message: "Transaction verification signature invalid" });
-                }
+            if (!valid) {
+                await session.abortTransaction();
+                session.endSession();
+                return res.status(400).json({ message: error });
             }
         }
 
-        // Create the official booking record
+        // Step 5: Create the official booking record
         const booking = await Booking.create(
             [
                 {
@@ -128,12 +90,12 @@ const confirmBooking = async (req, res) => {
                     razorpayPaymentId: razorpayPaymentId || null,
                     razorpaySignature: razorpaySignature || null,
                     paymentStatus: totalPrice > 0 ? "paid" : "free",
-                }
+                },
             ],
             { session }
         );
 
-        // Step 4: Mark seats as "booked"
+        // Step 6: Mark seats as "booked"
         await Seat.updateMany(
             {
                 eventId: reservation.eventId,
@@ -144,11 +106,19 @@ const confirmBooking = async (req, res) => {
             { session }
         );
 
-        // Step 5: Delete the reservation (it's fulfilled)
+        // Step 7: Delete the reservation (it's fulfilled)
         await Reservation.deleteOne({ _id: reservationId }).session(session);
 
         await session.commitTransaction();
         session.endSession();
+
+        // Step 8: Send confirmation email (non-blocking — after transaction commits)
+        const user = await User.findById(req.user._id).select("name email");
+        if (user) {
+            sendTicketConfirmationEmail(user, booking[0], event).catch((err) =>
+                console.error("[Email] Background email error:", err.message)
+            );
+        }
 
         res.json({
             message: "Booking confirmed!",
@@ -166,7 +136,7 @@ const confirmBooking = async (req, res) => {
 
 //@desc Create Razorpay Order
 // @route POST /api/bookings/razorpay-order
-const createRazorpayOrder = async (req, res) => {
+const createRazorpayOrderHandler = async (req, res) => {
     const { reservationId } = req.body;
 
     if (!reservationId) {
@@ -192,28 +162,7 @@ const createRazorpayOrder = async (req, res) => {
             return res.status(404).json({ message: "Event not found" });
         }
 
-        // Calculate totalPrice
-        const basePrice = event.ticketType === "free" ? 0 : (event.ticketPrice || 0);
-        const totalSeats = event.totalSeats || 0;
-        const category = event.category?.toLowerCase() || "";
-        const isConcert = category.includes("concert") || category.includes("music") || category.includes("festival") || category.includes("nightlife");
-
-        let totalPrice = 0;
-        if (event.ticketType === "free") {
-            totalPrice = 0;
-        } else if (isConcert) {
-            reservation.seatNumbers.forEach(seatNum => {
-                if (seatNum <= Math.ceil(totalSeats * 0.15)) {
-                    totalPrice += Math.round(basePrice * 3); // VIP
-                } else if (seatNum <= Math.ceil(totalSeats * 0.40)) {
-                    totalPrice += Math.round(basePrice * 2); // Gold
-                } else {
-                    totalPrice += basePrice; // GA
-                }
-            });
-        } else {
-            totalPrice = basePrice * reservation.seatNumbers.length;
-        }
+        const totalPrice = calculateTotalPrice(event, reservation.seatNumbers);
 
         if (totalPrice === 0) {
             return res.json({
@@ -222,43 +171,12 @@ const createRazorpayOrder = async (req, res) => {
             });
         }
 
-        const keyId = process.env.RAZORPAY_KEY_ID;
-        const keySecret = process.env.RAZORPAY_KEY_SECRET;
-        const isDummy = !keyId || !keySecret || keyId.includes("mock") || keyId.includes("default");
-
-        if (isDummy) {
-            return res.json({
-                paymentRequired: true,
-                isMock: true,
-                orderId: `order_mock_${Date.now()}_${reservationId}`,
-                amount: totalPrice * 100,
-                currency: "INR",
-                totalPrice,
-                keyId: "rzp_test_mockKeyId123",
-            });
-        }
-
-        const razorpayInstance = new Razorpay({
-            key_id: keyId,
-            key_secret: keySecret,
-        });
-
-        const options = {
-            amount: totalPrice * 100, // paise
-            currency: "INR",
-            receipt: `receipt_${reservationId}`,
-        };
-
-        const order = await razorpayInstance.orders.create(options);
+        const order = await createRazorpayOrder(totalPrice, reservationId);
 
         res.json({
             paymentRequired: true,
-            isMock: false,
-            orderId: order.id,
-            amount: order.amount,
-            currency: order.currency,
+            ...order,
             totalPrice,
-            keyId: keyId,
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -278,4 +196,4 @@ const getUserBookings = async (req, res) => {
     }
 };
 
-module.exports = { confirmBooking, getUserBookings, createRazorpayOrder };
+module.exports = { confirmBooking, getUserBookings, createRazorpayOrder: createRazorpayOrderHandler };
