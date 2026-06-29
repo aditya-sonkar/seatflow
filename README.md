@@ -6,6 +6,7 @@ A transaction-safe event ticketing and live seating reservation platform.
 ![Node Express](https://img.shields.io/badge/Node.js-Express_5-green?style=flat-square&logo=node.js)
 ![MongoDB Mongoose](https://img.shields.io/badge/MongoDB-Mongoose_9-emerald?style=flat-square&logo=mongodb)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS_v4-38bdf8?style=flat-square&logo=tailwind-css)
+![Razorpay](https://img.shields.io/badge/Razorpay-Payments-3395FF?style=flat-square&logo=razorpay)
 ![Vercel](https://img.shields.io/badge/Vercel-Frontend-black?style=flat-square&logo=vercel)
 ![Render](https://img.shields.io/badge/Render-Backend-46a2f1?style=flat-square&logo=render)
 ![License MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
@@ -33,6 +34,8 @@ A transaction-safe event ticketing and live seating reservation platform.
 *   **10-Minute Hold Reservation:** Visual countdown hold timer backed by a background interval worker cleaning expired reservations.
 *   **Dynamic Tier Pricing:** Automatically applies pricing multipliers for VIP (3x), Gold (2x), and General Admission (1x) tiers.
 *   **Razorpay & Mock Gateways:** Integrated checkouts with an automatic mock payment gateway fallback for offline testing.
+    
+    <img src="https://badges.razorpay.com/badge-dark.png" alt="Razorpay Badge" width="180" />
 *   **Organizer Dashboard:** Full dashboard utility to register, manage, and edit active events.
 
 ---
